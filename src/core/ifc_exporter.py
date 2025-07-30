@@ -154,6 +154,50 @@ class IFCExporter:
             TrueNorth=None
         )
         
+        # Set map conversion for IFC4X3 with EPSG code if available
+        if schema == "IFC4X3" and self.project_settings and 'project_settings' in self.project_settings:
+            ps = self.project_settings['project_settings']
+            target_crs = ps.get('target_crs', getattr(config, 'TARGET_CRS', 'EPSG:5110'))
+            
+            # Extract the EPSG code from the string (format: "EPSG:XXXX")
+            try:
+                if ":" in target_crs:
+                    epsg_code = target_crs.split(':')[1]
+                else:
+                    epsg_code = target_crs
+                
+                # Create map conversion
+                print(f"Setting IFC4X3 coordinate reference system with EPSG code: {epsg_code}")
+                
+                # Create project CRS as a projected CRS
+                project_crs = self.ifc_file.create_entity(
+                    "IfcProjectedCRS",
+                    Name=f"EPSG:{epsg_code}",
+                    Description=f"Coordinate system with EPSG code {epsg_code}",
+                    GeodeticDatum=f"EPSG:{epsg_code}",
+                    MapProjection=f"EPSG:{epsg_code} projection",
+                    MapZone=f"EPSG:{epsg_code} zone"
+                )
+                
+                # Create map conversion (with identity values)
+                self.ifc_file.create_entity(
+                    "IfcMapConversion",
+                    SourceCRS=self.context,
+                    TargetCRS=project_crs,
+                    Eastings=0.0,
+                    Northings=0.0,
+                    OrthogonalHeight=0.0,
+                    XAxisAbscissa=1.0,
+                    XAxisOrdinate=0.0,
+                    Scale=1.0
+                )
+                
+                print("Successfully set coordinate system in IFC4X3 file")
+            except Exception as e:
+                print(f"Error setting coordinate system: {e}")
+        else:
+            print("Skipping coordinate system setup (only supported in IFC4X3)")
+        
         # Create units first (required for project)
         length_unit = self.ifc_file.createIfcSIUnit(
             UnitType="LENGTHUNIT",
@@ -732,7 +776,6 @@ class IFCExporter:
             schema: IFC schema version to use (IFC2x3 or IFC4X3)
         """
         import json
-        import os
         
         # Load processed images from JSON
         print(f"Loading image data from: {json_file_path}")
@@ -747,6 +790,10 @@ class IFCExporter:
             print(f"First image filename: {processed_images[0].get('filename', 'unknown')}")
             print(f"First image transformed coordinates: {processed_images[0].get('transformed_x', 'N/A')}, "
                   f"{processed_images[0].get('transformed_y', 'N/A')}, {processed_images[0].get('transformed_z', 'N/A')}")
+            
+            # Print coordinate system if available
+            if 'coordinate_system' in processed_images[0]:
+                print(f"Coordinate system: {processed_images[0]['coordinate_system']}")
         
         # Load project settings if provided
         if project_settings_path and os.path.exists(project_settings_path):
@@ -767,8 +814,6 @@ class IFCExporter:
             output_path: Path to output IFC file
             schema: IFC schema version to use (IFC2x3 or IFC4X3)
         """
-        import os
-        
         if not processed_images:
             print("No processed images to export.")
             return
@@ -778,6 +823,18 @@ class IFCExporter:
             print(f"First image data keys: {list(processed_images[0].keys())}")
             
         print(f"Creating {schema} file with {len(processed_images)} markers...")
+
+        # Extract coordinate system from first image with coordinate_system if available
+        if schema == "IFC4X3" and processed_images and 'coordinate_system' in processed_images[0]:
+            if not self.project_settings:
+                self.project_settings = {}
+            if 'project_settings' not in self.project_settings:
+                self.project_settings['project_settings'] = {}
+            
+            # Get the coordinate system from the first image
+            coordinate_system = processed_images[0]['coordinate_system']
+            self.project_settings['project_settings']['target_crs'] = coordinate_system
+            print(f"Using coordinate system from images: {coordinate_system}")
 
         # Create IFC file structure
         try:
@@ -833,7 +890,7 @@ class IFCExporter:
                 traceback.print_exc()
 
         # Ensure output directory exists
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
 
         # Write IFC file
         try:

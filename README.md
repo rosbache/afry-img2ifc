@@ -31,19 +31,20 @@ All dependencies are listed in the `requirements.txt` file and will be installed
 
 ## Usage
 
-1. Place your images in the `images/` folder
-2. Update the configuration in `config.py` if needed
-3. Run the main script:
-```bash
-python main.py
-```
+Run the EXE file or main.py to open the GUI.
 
-The script will:
-- Process all images in the images folder
-- Extract GPS coordinates and metadata
-- Transform coordinates to the specified target EPSG code
-- Create an IFC file with 3D cube markers at each image location
-- Apply proper coordinate system settings for IFC4.3 exports
+Step 1: Create json file from images
+(1) Select folder where image(s) is located
+(2) Set EPSG code and test to see if it is correct coordinate system. 
+(3) Generate json file
+(4) Edit json file if the image URL is different than the file path to the image
+
+Step 2: Create ifc file from json file
+(5) Select or create a project template settings file to set name of the creator and other name than the default values for the ifc hierarchy.
+(6) Select folder for ifc output
+(7) Set name of ifc file
+(8) Specifiy schema for ifc file, 3x3 or 4.3
+(9) Generate ifc
 
 ## Configuration
 
@@ -53,36 +54,6 @@ Edit `config.py` to customize:
 - Cube marker radius and materials
 - URL patterns for hosted images
 - IFC schema version (IFC2x3 or IFC4X3)
-
-## Scripts
-
-### Main Pipeline
-- **`main.py`** - Complete image processing pipeline (EXIF → coordinates → IFC)
-- **`json_to_ifc.py`** - Standalone IFC generator from processed JSON data
-
-### JSON to IFC Converter
-
-If you already have processed image data in JSON format, you can generate IFC files directly:
-
-```bash
-# Auto-detect JSON file
-python json_to_ifc.py
-
-# Specify JSON file
-python json_to_ifc.py processed_images.json
-
-# Custom output location  
-python json_to_ifc.py data.json -o markers.ifc
-
-# Use IFC4.3 schema with EPSG support
-python json_to_ifc.py data.json -o markers.ifc -s IFC4X3
-```
-
-This is useful for:
-- Regenerating IFC files with different settings
-- Creating IFC files without access to original images
-- Batch processing multiple datasets
-- Testing different IFC schemas and coordinate systems
 
 ## Output
 
@@ -105,12 +76,6 @@ The GUI allows you to:
 3. Choose between IFC2x3 and IFC4.3 schemas
 4. Process images and generate IFC files in a step-by-step workflow
 
-## Validation Tools
-
-- **`validate_requirements.py`** - Comprehensive validation of IFC requirements
-- **`verify_ifc.py`** - Basic IFC file structure verification  
-- **`test_ifc_structure.py`** - Test IFC creation with dummy data
-
 ## Technical Details
 
 ### Coordinate System Handling
@@ -128,62 +93,6 @@ The application handles various formats of GPS data in EXIF:
 2. Converts to decimal degrees
 3. Transforms to the target coordinate system
 4. Applies elevation data if available
-
-## Distribution
-
-To distribute this application to other users without publishing it online, you have several options:
-
-### Option 1: Packaging as a Standalone Executable
-
-You can use PyInstaller to create a standalone executable that includes Python and all dependencies:
-
-```bash
-# Install PyInstaller
-pip install pyinstaller
-
-# Create a single executable
-pyinstaller --onefile --windowed --name afry-img2ifc --icon=resources/icon.ico src/gui/main_window.py
-
-# Or create a directory with all dependencies (often more reliable)
-pyinstaller --name afry-img2ifc --windowed --icon=resources/icon.ico src/gui/main_window.py
-```
-
-The resulting executable(s) will be in the `dist` folder and can be distributed to users who don't need to install Python.
-
-### Option 2: Using the Included Distribution Files
-
-This repository includes several files to help with distribution:
-
-- `setup.bat` - Installs required dependencies on Windows
-- `run_gui.bat` - Launches the graphical user interface
-- `run_console.bat` - Runs the command-line version
-- `setup.py` - For installing as a local Python package
-- `installer.nsi` - NSIS script for creating a Windows installer
-
-To create a distributable package:
-
-1. Clone the repository
-2. Include all necessary files (including the `.bat` files)
-3. Create a ZIP archive of the contents
-4. Instruct users to run `setup.bat` after extracting the ZIP
-
-### Option 3: Creating an Installer
-
-For a more professional distribution, you can create an installer:
-
-1. Use the included NSIS script (`installer.nsi`) to create a Windows installer:
-   - Install NSIS (Nullsoft Scriptable Install System) from https://nsis.sourceforge.io/
-   - First use PyInstaller to create the application bundle
-   - Right-click on `installer.nsi` and select "Compile NSIS Script"
-   - The resulting `AFRY_Image2IFC_Setup.exe` can be distributed to users
-
-2. The installer will:
-   - Install the application to Program Files
-   - Create Start Menu shortcuts
-   - Add uninstall support
-   - Create desktop shortcuts
-
-This provides the most user-friendly installation experience for non-technical users.
 
 ## IFC File Specifications
 

@@ -27,8 +27,7 @@ setup(
     install_requires=requirements,
     entry_points={
         'console_scripts': [
-            'afry-img2ifc=main:main',
-            'afry-img2ifc-gui=src.gui.main_window:main',
+            'afry-img2ifc=main:main',            
         ],
     },
     include_package_data=True,

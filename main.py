@@ -6,12 +6,25 @@ import tkinter as tk
 import os
 import sys
 
-# Add src directory to path
+# Add parent directory to path for more reliable imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = os.path.join(current_dir, 'src')
-sys.path.insert(0, src_dir)
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 
-from gui.main_window import ImageToIFCGUI
+# Use explicit import from src package
+try:
+    from src.gui.main_window import ImageToIFCGUI
+except ImportError:
+    # Fallback for when running from PyInstaller bundle
+    try:
+        # Try direct import (may work in PyInstaller context)
+        from gui.main_window import ImageToIFCGUI
+    except ImportError:
+        print("Error: Could not import GUI module. Make sure you're running from the correct directory.")
+        import traceback
+        traceback.print_exc()
+        input("Press Enter to exit...")
+        sys.exit(1)
 
 
 def main():

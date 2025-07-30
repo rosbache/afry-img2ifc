@@ -1,0 +1,18 @@
+[
+  {
+    "filename": "2025-07-28_360_pos1.JPG",
+    "filepath": "C:\\Users\\HTO334\\OneDrive - AFRY\\Documents\\GitHub\\afry-img2ifc\\images\\2025-07-28_360_pos1.JPG",
+    "image_url": "file://C:/Users/HTO334/OneDrive - AFRY/Documents/GitHub/afry-img2ifc/images/2025-07-28_360_pos1.JPG",
+    "filesize": 42590208,
+    "processing_date": "2025-07-30T10:30:33.554874",
+    "has_gps": true,
+    "date_taken": "2025:07:28 06:03:12",
+    "latitude": 59.91374783333333,
+    "longitude": 10.580114694444445,
+    "elevation": 169.142,
+    "transformed_x": 104482.03073681235,
+    "transformed_y": 1213183.370915072,
+    "coordinate_system": "EPSG:5110",
+    "transformed_z": 169.142
+  }
+]

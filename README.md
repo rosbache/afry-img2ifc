@@ -45,6 +45,7 @@ Step 2: Create ifc file from json file
 (7) Set name of ifc file
 (8) Specifiy schema for ifc file, 3x3 or 4.3
 (9) Generate ifc
+<img width="991" height="810" alt="image" src="https://github.com/user-attachments/assets/e3a94e3d-08b3-433c-a362-ea5205d14010" />
 
 ## Configuration
 

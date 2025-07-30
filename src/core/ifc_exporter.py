@@ -65,10 +65,21 @@ class IFCExporter:
         # Assign units to project
         self.project.UnitsInContext = unit_assignment
     
-    def create_ifc_file(self):
-        """Create a new IFC file with basic structure"""
-        # Create new IFC file
-        self.ifc_file = ifcopenshell.file()
+    def create_ifc_file(self, schema: str = "IFC2x3"):
+        """Create a new IFC file with basic structure
+        
+        Args:
+            schema: IFC schema version to use (IFC2x3 or IFC4X3)
+        """
+        # Create new IFC file with specified schema
+        if schema == "IFC4X3":
+            # Create IFC4.3 file
+            self.ifc_file = ifcopenshell.file(schema="IFC4X3")
+            print("Creating IFC4.3 file")
+        else:
+            # Default to IFC2x3
+            self.ifc_file = ifcopenshell.file()
+            print("Creating IFC2x3 file (default)")
         
         # Use project settings if available, otherwise use defaults
         if self.project_settings and 'project_settings' in self.project_settings:
@@ -163,17 +174,30 @@ class IFCExporter:
         ])
         
         # Create project ONLY ONCE with required attributes
-        self.project = self.ifc_file.createIfcProject(
-            ifcopenshell.guid.new(),
-            owner_history,
-            project_name,
-            project_description,
-            None,
-            None,
-            None,
-            [self.context],  # RepresentationContexts
-            unit_assignment   # UnitsInContext
-        )
+        # In IFC4.3, OwnerHistory is optional and discouraged
+        if schema == "IFC4X3":
+            self.project = self.ifc_file.createIfcProject(
+                GlobalId=ifcopenshell.guid.new(),
+                Name=project_name,
+                Description=project_description,
+                RepresentationContexts=[self.context],
+                UnitsInContext=unit_assignment
+            )
+            print("Created IFC4.3 project without OwnerHistory")
+        else:
+            # IFC2x3 requires OwnerHistory
+            self.project = self.ifc_file.createIfcProject(
+                ifcopenshell.guid.new(),
+                owner_history,
+                project_name,
+                project_description,
+                None,
+                None,
+                None,
+                [self.context],  # RepresentationContexts
+                unit_assignment   # UnitsInContext
+            )
+            print("Created IFC2x3 project with OwnerHistory")
         
         # Create 3D body context as subcontext
         self.body_context = self.ifc_file.createIfcGeometricRepresentationSubContext(
@@ -188,97 +212,169 @@ class IFCExporter:
         )
         
         # Create site
-        self.site = self.ifc_file.createIfcSite(
-            ifcopenshell.guid.new(),
-            owner_history,
-            site_name,
-            site_description,
-            None,
-            self.ifc_file.createIfcLocalPlacement(
+        if schema == "IFC4X3":
+            self.site = self.ifc_file.createIfcSite(
+                GlobalId=ifcopenshell.guid.new(),
+                Name=site_name,
+                Description=site_description,
+                ObjectPlacement=self.ifc_file.createIfcLocalPlacement(
+                    None,
+                    self.ifc_file.createIfcAxis2Placement3D(
+                        self.ifc_file.createIfcCartesianPoint([0.0, 0.0, 0.0])
+                    )
+                ),
+                CompositionType="ELEMENT"
+            )
+            print("Created IFC4.3 site without OwnerHistory")
+        else:
+            self.site = self.ifc_file.createIfcSite(
+                ifcopenshell.guid.new(),
+                owner_history,
+                site_name,
+                site_description,
                 None,
-                self.ifc_file.createIfcAxis2Placement3D(
-                    self.ifc_file.createIfcCartesianPoint([0.0, 0.0, 0.0])
-                )
-            ),
-            None,
-            None,
-            "ELEMENT",
-            None,
-            None,
-            None,
-            None,
-            None
-        )
+                self.ifc_file.createIfcLocalPlacement(
+                    None,
+                    self.ifc_file.createIfcAxis2Placement3D(
+                        self.ifc_file.createIfcCartesianPoint([0.0, 0.0, 0.0])
+                    )
+                ),
+                None,
+                None,
+                "ELEMENT",
+                None,
+                None,
+                None,
+                None,
+                None
+            )
+            print("Created IFC2x3 site with OwnerHistory")
         
         # Assign site to project
-        self.ifc_file.createIfcRelAggregates(
-            ifcopenshell.guid.new(),
-            owner_history,
-            "Project-Site",
-            None,
-            self.project,
-            [self.site]
-        )
+        if schema == "IFC4X3":
+            self.ifc_file.createIfcRelAggregates(
+                GlobalId=ifcopenshell.guid.new(),
+                Name="Project-Site",
+                RelatingObject=self.project,
+                RelatedObjects=[self.site]
+            )
+        else:
+            self.ifc_file.createIfcRelAggregates(
+                ifcopenshell.guid.new(),
+                owner_history,
+                "Project-Site",
+                None,
+                self.project,
+                [self.site]
+            )
         
         # Create building
-        self.building = self.ifc_file.createIfcBuilding(
-            ifcopenshell.guid.new(),
-            owner_history,
-            building_name,
-            building_description,
-            None,
-            self.ifc_file.createIfcLocalPlacement(
-                self.site.ObjectPlacement,
-                self.ifc_file.createIfcAxis2Placement3D(
-                    self.ifc_file.createIfcCartesianPoint([0.0, 0.0, 0.0])
-                )
-            ),
-            None,
-            None,
-            "ELEMENT",
-            None,
-            None,
-            None
-        )
+        if schema == "IFC4X3":
+            self.building = self.ifc_file.createIfcBuilding(
+                GlobalId=ifcopenshell.guid.new(),
+                Name=building_name,
+                Description=building_description,
+                ObjectPlacement=self.ifc_file.createIfcLocalPlacement(
+                    self.site.ObjectPlacement,
+                    self.ifc_file.createIfcAxis2Placement3D(
+                        self.ifc_file.createIfcCartesianPoint([0.0, 0.0, 0.0])
+                    )
+                ),
+                CompositionType="ELEMENT"
+            )
+            print("Created IFC4.3 building without OwnerHistory")
+        else:
+            self.building = self.ifc_file.createIfcBuilding(
+                ifcopenshell.guid.new(),
+                owner_history,
+                building_name,
+                building_description,
+                None,
+                self.ifc_file.createIfcLocalPlacement(
+                    self.site.ObjectPlacement,
+                    self.ifc_file.createIfcAxis2Placement3D(
+                        self.ifc_file.createIfcCartesianPoint([0.0, 0.0, 0.0])
+                    )
+                ),
+                None,
+                None,
+                "ELEMENT",
+                None,
+                None,
+                None
+            )
+            print("Created IFC2x3 building with OwnerHistory")
         
         # Assign building to site
-        self.ifc_file.createIfcRelAggregates(
-            ifcopenshell.guid.new(),
-            owner_history,
-            "Site-Building",
-            None,
-            self.site,
-            [self.building]
-        )
+        if schema == "IFC4X3":
+            self.ifc_file.createIfcRelAggregates(
+                GlobalId=ifcopenshell.guid.new(),
+                Name="Site-Building",
+                RelatingObject=self.site,
+                RelatedObjects=[self.building]
+            )
+        else:
+            self.ifc_file.createIfcRelAggregates(
+                ifcopenshell.guid.new(),
+                owner_history,
+                "Site-Building",
+                None,
+                self.site,
+                [self.building]
+            )
         
         # Create building storey
-        self.storey = self.ifc_file.createIfcBuildingStorey(
-            ifcopenshell.guid.new(),
-            owner_history,
-            storey_name,
-            storey_description,
-            None,
-            self.ifc_file.createIfcLocalPlacement(
-                self.building.ObjectPlacement,
-                self.ifc_file.createIfcAxis2Placement3D(
-                    self.ifc_file.createIfcCartesianPoint([0.0, 0.0, 0.0])
-                )
-            ),
-            None,
-            None,
-            "ELEMENT",
-            None
-        )
+        if schema == "IFC4X3":
+            self.storey = self.ifc_file.createIfcBuildingStorey(
+                GlobalId=ifcopenshell.guid.new(),
+                Name=storey_name,
+                Description=storey_description,
+                ObjectPlacement=self.ifc_file.createIfcLocalPlacement(
+                    self.building.ObjectPlacement,
+                    self.ifc_file.createIfcAxis2Placement3D(
+                        self.ifc_file.createIfcCartesianPoint([0.0, 0.0, 0.0])
+                    )
+                ),
+                CompositionType="ELEMENT"
+            )
+            print("Created IFC4.3 building storey without OwnerHistory")
+        else:
+            self.storey = self.ifc_file.createIfcBuildingStorey(
+                ifcopenshell.guid.new(),
+                owner_history,
+                storey_name,
+                storey_description,
+                None,
+                self.ifc_file.createIfcLocalPlacement(
+                    self.building.ObjectPlacement,
+                    self.ifc_file.createIfcAxis2Placement3D(
+                        self.ifc_file.createIfcCartesianPoint([0.0, 0.0, 0.0])
+                    )
+                ),
+                None,
+                None,
+                "ELEMENT",
+                None
+            )
+            print("Created IFC2x3 building storey with OwnerHistory")
         
         # Assign storey to building
-        self.ifc_file.createIfcRelAggregates(
-            ifcopenshell.guid.new(),
-            owner_history,
-            "Building-Storey",
-            None,
-            self.building,
-            [self.storey]
-        )
+        if schema == "IFC4X3":
+            self.ifc_file.createIfcRelAggregates(
+                GlobalId=ifcopenshell.guid.new(),
+                Name="Building-Storey",
+                RelatingObject=self.building,
+                RelatedObjects=[self.storey]
+            )
+        else:
+            self.ifc_file.createIfcRelAggregates(
+                ifcopenshell.guid.new(),
+                owner_history,
+                "Building-Storey",
+                None,
+                self.building,
+                [self.storey]
+            )
         
         return self.ifc_file
     
@@ -370,19 +466,22 @@ class IFCExporter:
         
         return shape_representation
     
-    def create_cube_marker(self, image_data: Dict, geometry: ifcopenshell.entity_instance = None) -> ifcopenshell.entity_instance:
+    def create_cube_marker(self, image_data: Dict, geometry: ifcopenshell.entity_instance = None, schema: str = "IFC2x3") -> ifcopenshell.entity_instance:
         """
         Create a marker element at the image location with optional embedded image
         
         Args:
             image_data: Dictionary containing image metadata and coordinates
             geometry: Optional pre-created geometry (if None, creates textured cube)
+            schema: IFC schema version to use (IFC2x3 or IFC4X3)
             
         Returns:
             Created IfcBuildingElementProxy (marker)
         """
-        # Get owner history from project
-        owner_history = self.project.OwnerHistory
+        # Get owner history from project (only in IFC2x3)
+        owner_history = None
+        if hasattr(self.project, 'OwnerHistory'):
+            owner_history = self.project.OwnerHistory
         
         # Create geometry with embedded image if not provided
         if geometry is None:
@@ -392,98 +491,152 @@ class IFCExporter:
         if not all(k in image_data for k in ("transformed_x", "transformed_y", "transformed_z")):
             raise ValueError(f"Missing transformed coordinates for {image_data.get('filename', 'unknown image')}")
         
-        # Create marker as building element proxy manually
-        cube = self.ifc_file.createIfcBuildingElementProxy(
-            ifcopenshell.guid.new(),
-            owner_history,
-            f"Image Marker - {image_data.get('filename', 'Unknown')}",
-            "360° panoramic image marker at GPS location",
-            None,
-            self.ifc_file.createIfcLocalPlacement(
-                self.storey.ObjectPlacement,
-                self.ifc_file.createIfcAxis2Placement3D(
-                    self.ifc_file.createIfcCartesianPoint([
-                        float(image_data['transformed_x']),
-                        float(image_data['transformed_y']),
-                        float(image_data['transformed_z'])
-                    ])
-                )
-            ),
-            self.ifc_file.createIfcProductDefinitionShape(None, None, [geometry]),
-            None,
-            "ELEMENT"
+        # Create marker as building element proxy based on schema
+        marker_name = f"Image Marker - {image_data.get('filename', 'Unknown')}"
+        marker_description = "360° panoramic image marker at GPS location"
+        marker_placement = self.ifc_file.createIfcLocalPlacement(
+            self.storey.ObjectPlacement,
+            self.ifc_file.createIfcAxis2Placement3D(
+                self.ifc_file.createIfcCartesianPoint([
+                    float(image_data['transformed_x']),
+                    float(image_data['transformed_y']),
+                    float(image_data['transformed_z'])
+                ])
+            )
         )
+        product_shape = self.ifc_file.createIfcProductDefinitionShape(None, None, [geometry])
         
-        # Assign to building storey manually
-        self.ifc_file.createIfcRelContainedInSpatialStructure(
-            ifcopenshell.guid.new(),
-            owner_history,
-            "StoreyContains",
-            None,
-            [cube],
-            self.storey
-        )
+        if schema == "IFC4X3":
+            # IFC4.3 version (no owner history)
+            cube = self.ifc_file.createIfcBuildingElementProxy(
+                GlobalId=ifcopenshell.guid.new(),
+                Name=marker_name,
+                Description=marker_description,
+                ObjectPlacement=marker_placement,
+                Representation=product_shape,
+                ObjectType="ELEMENT"
+            )
+            print(f"Created IFC4.3 marker at {image_data['transformed_x']}, {image_data['transformed_y']}, {image_data['transformed_z']}")
+        else:
+            # IFC2x3 version (with owner history)
+            cube = self.ifc_file.createIfcBuildingElementProxy(
+                ifcopenshell.guid.new(),
+                owner_history,
+                marker_name,
+                marker_description,
+                None,
+                marker_placement,
+                product_shape,
+                None,
+                "ELEMENT"
+            )
+            print(f"Created IFC2x3 marker at {image_data['transformed_x']}, {image_data['transformed_y']}, {image_data['transformed_z']}")
+        
+        # Assign to building storey based on schema
+        if schema == "IFC4X3":
+            self.ifc_file.createIfcRelContainedInSpatialStructure(
+                GlobalId=ifcopenshell.guid.new(),
+                Name="StoreyContains",
+                RelatedElements=[cube],
+                RelatingStructure=self.storey
+            )
+        else:
+            self.ifc_file.createIfcRelContainedInSpatialStructure(
+                ifcopenshell.guid.new(),
+                owner_history,
+                "StoreyContains",
+                None,
+                [cube],
+                self.storey
+            )
         
         # Add custom properties for image data
-        self._add_image_properties(cube, image_data)
+        self._add_image_properties(cube, image_data, schema=schema)
         
         # Add document reference for clickable image access
-        self.add_image_document_reference(cube, image_data)
+        self.add_image_document_reference(cube, image_data, schema=schema)
 
         return cube
         
-    def add_image_document_reference(self, element: ifcopenshell.entity_instance, image_data: Dict):
+    def add_image_document_reference(self, element: ifcopenshell.entity_instance, image_data: Dict, schema: str = "IFC2x3"):
         """
         Add document reference to link the image to the marker element
         
         Args:
             element: The IFC element to link the document to
             image_data: Dictionary containing image metadata including URL
+            schema: IFC schema version to use (IFC2x3 or IFC4X3)
         """
         try:
-            # Get owner history from project
-            owner_history = self.project.OwnerHistory
+            # Get owner history from project (only in IFC2x3)
+            owner_history = None
+            if hasattr(self.project, 'OwnerHistory'):
+                owner_history = self.project.OwnerHistory
             
-            # Create document reference (different between IFC2x3 and IFC4)
-            # In IFC4, ItemReference is not available
-            try:
-                # Try to create IFC4 version
+            # Create document reference based on schema
+            if schema == "IFC4X3":
+                # IFC4.3 version
                 document = self.ifc_file.create_entity(
                     "IfcDocumentReference",
                     Description=f"360° panoramic image - {image_data.get('filename', 'Unknown')}",
                     Location=image_data.get('image_url', ''),
                     Identification=image_data.get('filename', 'Unknown')
                 )
-            except Exception as e1:
-                print(f"Trying alternative document reference format: {e1}")
+                print("Created IFC4.3 document reference")
+            else:
+                # IFC2x3 version
                 try:
-                    # Try to create IFC2x3 version
                     document = self.ifc_file.createIfcDocumentReference(
                         Location=image_data.get('image_url', ''),
                         ItemReference=image_data.get('filename', 'Unknown'),
                         Name="360° panoramic image"
                     )
-                except Exception as e2:
-                    print(f"Could not create document reference: {e2}")
-                    # Skip document reference if it fails
-                    return
+                    print("Created IFC2x3 document reference")
+                except Exception as e:
+                    print(f"Could not create IFC2x3 document reference: {e}")
+                    # Try alternative format as fallback
+                    document = self.ifc_file.create_entity(
+                        "IfcDocumentReference",
+                        Description=f"360° panoramic image - {image_data.get('filename', 'Unknown')}",
+                        Location=image_data.get('image_url', ''),
+                        Identification=image_data.get('filename', 'Unknown')
+                    )
+                    print("Created fallback document reference")
             
-            # Create document information relationship
-            self.ifc_file.createIfcRelAssociatesDocument(
-                GlobalId=ifcopenshell.guid.new(),
-                OwnerHistory=owner_history,
-                RelatedObjects=[element],
-                RelatingDocument=document
-            )
+            # Create document information relationship based on schema
+            if schema == "IFC4X3":
+                self.ifc_file.createIfcRelAssociatesDocument(
+                    GlobalId=ifcopenshell.guid.new(),
+                    RelatedObjects=[element],
+                    RelatingDocument=document
+                )
+                print("Created IFC4.3 document relationship without OwnerHistory")
+            else:
+                self.ifc_file.createIfcRelAssociatesDocument(
+                    GlobalId=ifcopenshell.guid.new(),
+                    OwnerHistory=owner_history,
+                    RelatedObjects=[element],
+                    RelatingDocument=document
+                )
+                print("Created IFC2x3 document relationship with OwnerHistory")
         except Exception as e:
             print(f"Error adding document reference: {e}")
             # Continue without the document reference
 
-    def _add_image_properties(self, element: ifcopenshell.entity_instance, image_data: Dict):
-        """Add custom properties to the marker element with image metadata"""
+    def _add_image_properties(self, element: ifcopenshell.entity_instance, image_data: Dict, schema: str = "IFC2x3"):
+        """
+        Add custom properties to the marker element with image metadata
         
-        # Get owner history from project
-        owner_history = self.project.OwnerHistory
+        Args:
+            element: The IFC element to add properties to
+            image_data: Dictionary containing image metadata
+            schema: IFC schema version to use (IFC2x3 or IFC4X3)
+        """
+        
+        # Get owner history from project (only in IFC2x3)
+        owner_history = None
+        if hasattr(self.project, 'OwnerHistory'):
+            owner_history = self.project.OwnerHistory
         
         # Create property values
         property_values = []
@@ -535,23 +688,40 @@ class IFCExporter:
                 )
             )
         
-        # Create property set
-        property_set = self.ifc_file.createIfcPropertySet(
-            GlobalId=ifcopenshell.guid.new(),
-            OwnerHistory=owner_history,
-            Name="ImageMetadata",
-            HasProperties=property_values
-        )
+        # Create property set based on schema
+        if schema == "IFC4X3":
+            # IFC4.3 version (no owner history)
+            property_set = self.ifc_file.createIfcPropertySet(
+                GlobalId=ifcopenshell.guid.new(),
+                Name="ImageMetadata",
+                HasProperties=property_values
+            )
+            print("Created IFC4.3 property set without OwnerHistory")
+        else:
+            # IFC2x3 version (with owner history)
+            property_set = self.ifc_file.createIfcPropertySet(
+                GlobalId=ifcopenshell.guid.new(),
+                OwnerHistory=owner_history,
+                Name="ImageMetadata",
+                HasProperties=property_values
+            )
         
-        # Relate to element
-        self.ifc_file.createIfcRelDefinesByProperties(
-            GlobalId=ifcopenshell.guid.new(),
-            OwnerHistory=owner_history,
-            RelatedObjects=[element],
-            RelatingPropertyDefinition=property_set
-        )
+        # Relate to element based on schema
+        if schema == "IFC4X3":
+            self.ifc_file.createIfcRelDefinesByProperties(
+                GlobalId=ifcopenshell.guid.new(),
+                RelatedObjects=[element],
+                RelatingPropertyDefinition=property_set
+            )
+        else:
+            self.ifc_file.createIfcRelDefinesByProperties(
+                GlobalId=ifcopenshell.guid.new(),
+                OwnerHistory=owner_history,
+                RelatedObjects=[element],
+                RelatingPropertyDefinition=property_set
+            )
         
-    def export_markers_from_json(self, json_file_path: str, output_path: str, project_settings_path: str = None):
+    def export_markers_from_json(self, json_file_path: str, output_path: str, project_settings_path: str = None, schema: str = "IFC2x3"):
         """
         Export markers directly from a JSON file
         
@@ -559,6 +729,7 @@ class IFCExporter:
             json_file_path: Path to JSON file with image data
             output_path: Path to output IFC file
             project_settings_path: Optional path to project settings JSON file
+            schema: IFC schema version to use (IFC2x3 or IFC4X3)
         """
         import json
         import os
@@ -584,19 +755,19 @@ class IFCExporter:
                 project_settings = json.load(f)
             self.set_project_settings(project_settings)
             
-        # Export the markers
-        self.export_markers(processed_images, output_path)
+        # Export the markers with specified schema
+        self.export_markers(processed_images, output_path, schema=schema)
     
-    def export_markers(self, processed_images: List[Dict], output_path: str):
+    def export_markers(self, processed_images: List[Dict], output_path: str, schema: str = "IFC2x3"):
         """
         Export all image markers to IFC file
         
         Args:
             processed_images: List of processed image data
             output_path: Path to output IFC file
+            schema: IFC schema version to use (IFC2x3 or IFC4X3)
         """
         import os
-        import json
         
         if not processed_images:
             print("No processed images to export.")
@@ -606,13 +777,13 @@ class IFCExporter:
         if processed_images and len(processed_images) > 0:
             print(f"First image data keys: {list(processed_images[0].keys())}")
             
-        print(f"Creating IFC file with {len(processed_images)} markers...")
+        print(f"Creating {schema} file with {len(processed_images)} markers...")
 
         # Create IFC file structure
         try:
             print("Creating IFC file structure...")
-            self.create_ifc_file()
-            print("IFC structure created successfully")
+            self.create_ifc_file(schema=schema)
+            print(f"IFC structure created successfully using {schema} schema")
         except Exception as e:
             print(f"Error creating IFC structure: {e}")
             import traceback
@@ -649,7 +820,7 @@ class IFCExporter:
                     print(f"Creating marker for {image_data['filename']} at ({image_data['transformed_x']}, {image_data['transformed_y']}, {image_data['transformed_z']})")
                     
                     # Create the marker
-                    self.create_cube_marker(image_data, geometry=marker_geometry)
+                    self.create_cube_marker(image_data, geometry=marker_geometry, schema=schema)
                     markers_created += 1
                     print(f"Created marker for {image_data['filename']}")
                 else:

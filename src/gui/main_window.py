@@ -78,6 +78,7 @@ class ImageToIFCGUI:
         self.step2_project_settings_path = tk.StringVar()
         self.step2_output_folder = tk.StringVar()
         self.step2_ifc_filename = tk.StringVar(value="markers.ifc")
+        self.step2_ifc_schema = tk.StringVar(value="IFC2x3")
         
         self.created_json_from_step1 = None
         
@@ -208,9 +209,18 @@ class ImageToIFCGUI:
         ttk.Entry(step2_frame, textvariable=self.step2_ifc_filename).grid(
             row=3, column=1, sticky=(tk.W, tk.E), padx=(5, 5), pady=2)
         
+        # IFC Schema version
+        ttk.Label(step2_frame, text="IFC Schema version:").grid(row=4, column=0, sticky=tk.W, pady=2)
+        schema_frame = ttk.Frame(step2_frame)
+        schema_frame.grid(row=4, column=1, sticky=(tk.W, tk.E), padx=(5, 5), pady=2)
+        ttk.Radiobutton(schema_frame, text="IFC2x3", variable=self.step2_ifc_schema, 
+                       value="IFC2x3").pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Radiobutton(schema_frame, text="IFC4.3", variable=self.step2_ifc_schema, 
+                       value="IFC4X3").pack(side=tk.LEFT)
+        
         # Generate IFC button
         ttk.Button(step2_frame, text="Generate IFC", 
-                  command=self.generate_ifc).grid(row=4, column=2, padx=(5, 0), pady=10)
+                  command=self.generate_ifc).grid(row=5, column=2, padx=(5, 0), pady=10)
     
     def validate_epsg_code(self, *args):
         """Validate EPSG code"""
@@ -439,11 +449,20 @@ class ImageToIFCGUI:
                 # Create the exporter
                 exporter = IFCExporter()
                 
-                # Use the export_markers_from_json method to handle everything
-                exporter.export_markers_from_json(json_path, output_path, project_settings_path)
+                # Get selected IFC schema
+                ifc_schema = self.step2_ifc_schema.get()
                 
-                self.status_var.set(f"IFC file created successfully: {output_path}")
-                messagebox.showinfo("Success", f"IFC file created successfully:\n{output_path}")
+                # Use the export_markers_from_json method to handle everything
+                exporter.export_markers_from_json(
+                    json_path, 
+                    output_path, 
+                    project_settings_path,
+                    schema=ifc_schema
+                )
+                
+                schema_version = "IFC2x3" if ifc_schema == "IFC2x3" else "IFC4.3"
+                self.status_var.set(f"{schema_version} file created successfully: {output_path}")
+                messagebox.showinfo("Success", f"{schema_version} file created successfully:\n{output_path}")
             except Exception as e:
                 self.status_var.set("Error during IFC generation")
                 messagebox.showerror("Error", f"Error during IFC generation:\n{str(e)}")

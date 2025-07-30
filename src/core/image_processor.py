@@ -182,6 +182,7 @@ def get_gps_coordinates(image_path):
             info = img._getexif()
             if not info:
                 return None, None
+            
             gps_info = None
             for tag, value in info.items():
                 decoded = TAGS.get(tag, tag)
@@ -191,26 +192,41 @@ def get_gps_coordinates(image_path):
                         sub_decoded = GPSTAGS.get(t, t)
                         gps_info[sub_decoded] = value[t]
                     break
+            
             if not gps_info:
                 return None, None
+                
+            # Helper function to convert GPS coordinates
             def get_decimal_from_dms(dms, ref):
-                degrees = dms[0][0] / dms[0][1]
-                minutes = dms[1][0] / dms[1][1]
-                seconds = dms[2][0] / dms[2][1]
+                # Support both tuple and IFD_Rational (float-like) types
+                def rational_to_float(r):
+                    try:
+                        return float(r.numerator) / float(r.denominator)
+                    except AttributeError:
+                        # Already a float or int
+                        return float(r)
+
+                degrees = rational_to_float(dms[0])
+                minutes = rational_to_float(dms[1])
+                seconds = rational_to_float(dms[2])
                 decimal = degrees + (minutes / 60.0) + (seconds / 3600.0)
                 if ref in ['S', 'W']:
                     decimal = -decimal
                 return decimal
+                
             gps_lat = gps_info.get("GPSLatitude")
             gps_lat_ref = gps_info.get("GPSLatitudeRef")
             gps_lon = gps_info.get("GPSLongitude")
             gps_lon_ref = gps_info.get("GPSLongitudeRef")
+            
             if gps_lat and gps_lat_ref and gps_lon and gps_lon_ref:
                 lat = get_decimal_from_dms(gps_lat, gps_lat_ref)
                 lon = get_decimal_from_dms(gps_lon, gps_lon_ref)
                 return lat, lon
+                
     except Exception as e:
         print(f"Error extracting GPS from {image_path}: {e}")
+        
     return None, None
 
 

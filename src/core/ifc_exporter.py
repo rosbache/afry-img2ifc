@@ -1,5 +1,5 @@
 """
-IFC exporter for creating 3D sphere markers at image locations
+IFC exporter for creating 3D cube markers at image locations
 """
 
 import os
@@ -9,6 +9,7 @@ import ifcopenshell.api
 import numpy as np
 from typing import List, Dict, Tuple
 import config
+import time
 
 
 class IFCExporter:
@@ -22,6 +23,17 @@ class IFCExporter:
         self.building = None
         self.storey = None
         self.context = None
+        self.project_settings = None
+    
+    def set_project_settings(self, project_settings: dict):
+        """
+        Set project settings from JSON configuration
+        
+        Args:
+            project_settings: Dictionary containing project settings
+        """
+        self.project_settings = project_settings
+        print(f"✅ Project settings configured")
     
     def _create_meter_units(self):
         """Create meter-based units for IFC2x3"""
@@ -53,35 +65,73 @@ class IFCExporter:
         # Assign units to project
         self.project.UnitsInContext = unit_assignment
     
-    def create_ifc_file(self) -> ifcopenshell.file:
+    def create_ifc_file(self):
         """Create a new IFC file with basic structure"""
-        # Create IFC file with IFC2x3 schema
-        self.ifc_file = ifcopenshell.file(schema="IFC2X3")
+        # Create new IFC file
+        self.ifc_file = ifcopenshell.file()
         
-        # Create application, person, organization and owner history manually for IFC2x3
-        application = self.ifc_file.createIfcApplication(
-            ApplicationDeveloper=self.ifc_file.createIfcOrganization("DEV", "Developer", None, None, None),
+        # Use project settings if available, otherwise use defaults
+        if self.project_settings and 'project_settings' in self.project_settings:
+            ps = self.project_settings['project_settings']
+            project_name = ps.get('ifc_project_name', getattr(config, 'IFC_PROJECT_NAME', 'Default Project'))
+            project_description = ps.get('ifc_project_description', getattr(config, 'IFC_PROJECT_DESCRIPTION', 'Default Description'))
+            site_name = ps.get('ifc_site_name', getattr(config, 'IFC_SITE_NAME', 'Default Site'))
+            site_description = ps.get('ifc_site_description', getattr(config, 'IFC_SITE_DESCRIPTION', 'Default Site Description'))
+            building_name = ps.get('ifc_building', getattr(config, 'IFC_BUILDING', 'Default Building'))
+            building_description = ps.get('ifc_building_description', getattr(config, 'IFC_BUILDING_DESCRIPTION', 'Default Building Description'))
+            storey_name = ps.get('ifc_building_storey', getattr(config, 'IFC_BUILDING_STOREY', 'Default Storey'))
+            storey_description = ps.get('ifc_building_storey_description', getattr(config, 'IFC_BUILDING_STOREY_DESCRIPTION', 'Default Storey Description'))
+        else:
+            project_name = getattr(config, 'IFC_PROJECT_NAME', 'Default Project')
+            project_description = getattr(config, 'IFC_PROJECT_DESCRIPTION', 'Default Description')
+            site_name = getattr(config, 'IFC_SITE_NAME', 'Default Site')
+            site_description = getattr(config, 'IFC_SITE_DESCRIPTION', 'Default Site Description')
+            building_name = getattr(config, 'IFC_BUILDING', 'Default Building')
+            building_description = getattr(config, 'IFC_BUILDING_DESCRIPTION', 'Default Building Description')
+            storey_name = getattr(config, 'IFC_BUILDING_STOREY', 'Default Storey')
+            storey_description = getattr(config, 'IFC_BUILDING_STOREY_DESCRIPTION', 'Default Storey Description')
+        
+        # Use owner information if available
+        if self.project_settings and 'owner_information' in self.project_settings:
+            owner_info = self.project_settings['owner_information']
+            person_given_name = owner_info.get('person_given_name', getattr(config, 'PERSON_GIVEN_NAME', 'Default'))
+            person_family_name = owner_info.get('person_family_name', getattr(config, 'PERSON_FAMILY_NAME', 'User'))
+            organization_name = owner_info.get('organization_name', getattr(config, 'ORGANIZATION_NAME', 'Default Organization'))
+        else:
+            person_given_name = getattr(config, 'PERSON_GIVEN_NAME', 'Default')
+            person_family_name = getattr(config, 'PERSON_FAMILY_NAME', 'User')
+            organization_name = getattr(config, 'ORGANIZATION_NAME', 'Default Organization')
+
+        # Create application and owner history
+        application = self.ifc_file.create_entity(
+            "IfcApplication",
+            ApplicationDeveloper=self.ifc_file.create_entity("IfcOrganization", Name=organization_name),
             Version="1.0",
-            ApplicationFullName="Image to IFC Exporter",
+            ApplicationFullName="Image GPS to IFC Converter",
             ApplicationIdentifier="IMG2IFC"
         )
         
-        person = self.ifc_file.createIfcPerson("USR", "User", None, None, None, None, None, None)
-        organization = self.ifc_file.createIfcOrganization("ORG", "Organization", None, None, None)
-        person_org = self.ifc_file.createIfcPersonAndOrganization(person, organization, None)
+        person = self.ifc_file.create_entity(
+            "IfcPerson",
+            GivenName=person_given_name,
+            FamilyName=person_family_name
+        )
         
-        # Create owner history
-        owner_history = self.ifc_file.createIfcOwnerHistory(
-            OwningUser=person_org,
+        person_and_organization = self.ifc_file.create_entity(
+            "IfcPersonAndOrganization",
+            ThePerson=person,
+            TheOrganization=application.ApplicationDeveloper
+        )
+        
+        owner_history = self.ifc_file.create_entity(
+            "IfcOwnerHistory",
+            OwningUser=person_and_organization,
             OwningApplication=application,
             State="READWRITE",
             ChangeAction="ADDED",
-            LastModifiedDate=None,
-            LastModifyingUser=None,
-            LastModifyingApplication=None,
-            CreationDate=int(__import__('time').time())
+            CreationDate=int(time.time())
         )
-        
+
         # Create geometric representation context first (required for project)
         self.context = self.ifc_file.createIfcGeometricRepresentationContext(
             ContextType="Model",
@@ -112,12 +162,12 @@ class IFCExporter:
             volume_unit
         ])
         
-        # Create project manually with required attributes
+        # Create project ONLY ONCE with required attributes
         self.project = self.ifc_file.createIfcProject(
             ifcopenshell.guid.new(),
             owner_history,
-            config.IFC_PROJECT_NAME,
-            None,
+            project_name,
+            project_description,
             None,
             None,
             None,
@@ -137,12 +187,12 @@ class IFCExporter:
             TrueNorth=None
         )
         
-        # Create site manually  
+        # Create site
         self.site = self.ifc_file.createIfcSite(
             ifcopenshell.guid.new(),
             owner_history,
-            config.IFC_SITE_NAME,
-            None,
+            site_name,
+            site_description,
             None,
             self.ifc_file.createIfcLocalPlacement(
                 None,
@@ -170,12 +220,12 @@ class IFCExporter:
             [self.site]
         )
         
-        # Create building manually
+        # Create building
         self.building = self.ifc_file.createIfcBuilding(
             ifcopenshell.guid.new(),
             owner_history,
-            config.IFC_BUILDING_NAME,
-            None,
+            building_name,
+            building_description,
             None,
             self.ifc_file.createIfcLocalPlacement(
                 self.site.ObjectPlacement,
@@ -201,12 +251,12 @@ class IFCExporter:
             [self.building]
         )
         
-        # Create building storey manually
+        # Create building storey
         self.storey = self.ifc_file.createIfcBuildingStorey(
             ifcopenshell.guid.new(),
             owner_history,
-            "Image Markers Level",
-            None,
+            storey_name,
+            storey_description,
             None,
             self.ifc_file.createIfcLocalPlacement(
                 self.building.ObjectPlacement,
@@ -336,22 +386,26 @@ class IFCExporter:
         
         # Create geometry with embedded image if not provided
         if geometry is None:
-            geometry = self.create_cube_geometry(image_data)
+            geometry = self.create_cube_geometry()
+        
+        # Ensure all required fields are present
+        if not all(k in image_data for k in ("transformed_x", "transformed_y", "transformed_z")):
+            raise ValueError(f"Missing transformed coordinates for {image_data.get('filename', 'unknown image')}")
         
         # Create marker as building element proxy manually
         cube = self.ifc_file.createIfcBuildingElementProxy(
             ifcopenshell.guid.new(),
             owner_history,
-            f"Image Marker - {image_data['filename']}",
-            f"360° panoramic image marker at GPS location",
+            f"Image Marker - {image_data.get('filename', 'Unknown')}",
+            "360° panoramic image marker at GPS location",
             None,
             self.ifc_file.createIfcLocalPlacement(
                 self.storey.ObjectPlacement,
                 self.ifc_file.createIfcAxis2Placement3D(
                     self.ifc_file.createIfcCartesianPoint([
-                        image_data['transformed_x'],
-                        image_data['transformed_y'],
-                        image_data['transformed_z']
+                        float(image_data['transformed_x']),
+                        float(image_data['transformed_y']),
+                        float(image_data['transformed_z'])
                     ])
                 )
             ),
@@ -386,23 +440,44 @@ class IFCExporter:
             element: The IFC element to link the document to
             image_data: Dictionary containing image metadata including URL
         """
-        # Get owner history from project
-        owner_history = self.project.OwnerHistory
-        
-        # Create document reference (IFC2x3 only supports 3 attributes: Location, ItemReference, Name)
-        document = self.ifc_file.createIfcDocumentReference(
-            Location=image_data['image_url'],
-            ItemReference=image_data['filename'],
-            Name="360° panoramic image"
-        )
-        
-        # Create document information relationship
-        self.ifc_file.createIfcRelAssociatesDocument(
-            GlobalId=ifcopenshell.guid.new(),
-            OwnerHistory=owner_history,
-            RelatedObjects=[element],
-            RelatingDocument=document
-        )
+        try:
+            # Get owner history from project
+            owner_history = self.project.OwnerHistory
+            
+            # Create document reference (different between IFC2x3 and IFC4)
+            # In IFC4, ItemReference is not available
+            try:
+                # Try to create IFC4 version
+                document = self.ifc_file.create_entity(
+                    "IfcDocumentReference",
+                    Description=f"360° panoramic image - {image_data.get('filename', 'Unknown')}",
+                    Location=image_data.get('image_url', ''),
+                    Identification=image_data.get('filename', 'Unknown')
+                )
+            except Exception as e1:
+                print(f"Trying alternative document reference format: {e1}")
+                try:
+                    # Try to create IFC2x3 version
+                    document = self.ifc_file.createIfcDocumentReference(
+                        Location=image_data.get('image_url', ''),
+                        ItemReference=image_data.get('filename', 'Unknown'),
+                        Name="360° panoramic image"
+                    )
+                except Exception as e2:
+                    print(f"Could not create document reference: {e2}")
+                    # Skip document reference if it fails
+                    return
+            
+            # Create document information relationship
+            self.ifc_file.createIfcRelAssociatesDocument(
+                GlobalId=ifcopenshell.guid.new(),
+                OwnerHistory=owner_history,
+                RelatedObjects=[element],
+                RelatingDocument=document
+            )
+        except Exception as e:
+            print(f"Error adding document reference: {e}")
+            # Continue without the document reference
 
     def _add_image_properties(self, element: ifcopenshell.entity_instance, image_data: Dict):
         """Add custom properties to the marker element with image metadata"""
@@ -475,6 +550,42 @@ class IFCExporter:
             RelatedObjects=[element],
             RelatingPropertyDefinition=property_set
         )
+        
+    def export_markers_from_json(self, json_file_path: str, output_path: str, project_settings_path: str = None):
+        """
+        Export markers directly from a JSON file
+        
+        Args:
+            json_file_path: Path to JSON file with image data
+            output_path: Path to output IFC file
+            project_settings_path: Optional path to project settings JSON file
+        """
+        import json
+        import os
+        
+        # Load processed images from JSON
+        print(f"Loading image data from: {json_file_path}")
+        with open(json_file_path, 'r', encoding='utf-8') as f:
+            processed_images = json.load(f)
+        
+        print(f"Loaded {len(processed_images)} images")
+        
+        # Print first image data to verify structure
+        if processed_images and len(processed_images) > 0:
+            print(f"First image data keys: {list(processed_images[0].keys())}")
+            print(f"First image filename: {processed_images[0].get('filename', 'unknown')}")
+            print(f"First image transformed coordinates: {processed_images[0].get('transformed_x', 'N/A')}, "
+                  f"{processed_images[0].get('transformed_y', 'N/A')}, {processed_images[0].get('transformed_z', 'N/A')}")
+        
+        # Load project settings if provided
+        if project_settings_path and os.path.exists(project_settings_path):
+            print(f"Loading project settings from: {project_settings_path}")
+            with open(project_settings_path, 'r', encoding='utf-8') as f:
+                project_settings = json.load(f)
+            self.set_project_settings(project_settings)
+            
+        # Export the markers
+        self.export_markers(processed_images, output_path)
     
     def export_markers(self, processed_images: List[Dict], output_path: str):
         """
@@ -484,12 +595,19 @@ class IFCExporter:
             processed_images: List of processed image data
             output_path: Path to output IFC file
         """
+        import os
+        import json
+        
         if not processed_images:
-            print("No processed images to export")
+            print("No processed images to export.")
             return
-        
+
+        # Debug: Print first image data to verify structure
+        if processed_images and len(processed_images) > 0:
+            print(f"First image data keys: {list(processed_images[0].keys())}")
+            
         print(f"Creating IFC file with {len(processed_images)} markers...")
-        
+
         # Create IFC file structure
         try:
             print("Creating IFC file structure...")
@@ -500,37 +618,58 @@ class IFCExporter:
             import traceback
             traceback.print_exc()
             return
-        
+
         # Create marker geometry (reuse for all markers)
         try:
             print("Creating marker geometry...")
-            cube_geometry = self.create_cube_geometry()
+            marker_radius = 1.0  # meters
+            marker_geometry = self.create_cube_geometry(radius=marker_radius)
             print("Geometry created successfully")
         except Exception as e:
             print(f"Error creating geometry: {e}")
             import traceback
             traceback.print_exc()
             return
-        
+
         # Create markers for each image
         markers_created = 0
         for image_data in processed_images:
             try:
-                marker = self.create_cube_marker(image_data, cube_geometry)
-                markers_created += 1
-                print(f"Created marker for {image_data['filename']}")
+                # Check if the required transformed coordinates exist
+                if all(k in image_data for k in ("transformed_x", "transformed_y", "transformed_z")):
+                    # Place marker at the transformed coordinates
+                    image_data.setdefault('filename', 'Marker')
+                    image_data.setdefault('image_url', '')
+                    image_data.setdefault('latitude', 0.0)
+                    image_data.setdefault('longitude', 0.0)
+                    image_data.setdefault('elevation', 0.0)
+                    image_data.setdefault('date_taken', '')
+                    
+                    # Debug: Print the transformed coordinates
+                    print(f"Creating marker for {image_data['filename']} at ({image_data['transformed_x']}, {image_data['transformed_y']}, {image_data['transformed_z']})")
+                    
+                    # Create the marker
+                    self.create_cube_marker(image_data, geometry=marker_geometry)
+                    markers_created += 1
+                    print(f"Created marker for {image_data['filename']}")
+                else:
+                    print(f"Skipping image (missing transformed coordinates): {image_data.get('filename')}")
+                    # Debug: Print available keys
+                    print(f"Available keys: {list(image_data.keys())}")
             except Exception as e:
-                print(f"Error creating marker for {image_data['filename']}: {str(e)}")
-        
+                print(f"Error creating marker for {image_data.get('filename', 'unknown')}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+
         # Ensure output directory exists
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
+
         # Write IFC file
         try:
             self.ifc_file.write(output_path)
             print(f"Successfully exported {markers_created} markers to {output_path}")
         except Exception as e:
             print(f"Error writing IFC file: {str(e)}")
-            raise
-
+            import traceback
+            traceback.print_exc()
 

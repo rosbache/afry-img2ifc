@@ -1,5 +1,13 @@
-Pillow>=10.0.0
-ExifRead>=3.0.0
-pyproj>=3.6.0
+# Core dependencies for Image GPS to IFC Converter
+
+# Image processing and EXIF data extraction
+Pillow>=9.0.0
+
+# Coordinate transformations
+pyproj>=3.4.0
+
+# IFC file processing
 ifcopenshell>=0.7.0
-numpy>=1.24.0
+
+# Optional: Enhanced drag and drop support
+# tkinterdnd2>=0.3.0

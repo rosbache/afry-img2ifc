@@ -1,0 +1,23 @@
+{
+    "project_settings": {
+        "ifc_project_name": "PROJECT_NAME",
+        "ifc_project_description": "Project Description",
+        "ifc_site_name": "Site Name",
+        "ifc_site_description": "Site Description",
+        "ifc_building": "Building Name",
+        "ifc_building_description": "Building Description",
+        "ifc_building_storey": "Storey Name",
+        "ifc_building_storey_description": "Storey Description"
+    },
+    "owner_information": {
+        "person_given_name": "First Name",
+        "person_family_name": "Last Name",
+        "organization_name": "Organization Name"
+    },
+    "pset_settings": {
+        "pset_name_fkb": "FKB Egenskaper",
+        "pset_description_fkb": "Pset for FKB properties",
+        "pset_name_project": "Project",
+        "pset_description_project": "Pset_Construction_Properties"
+    }
+}

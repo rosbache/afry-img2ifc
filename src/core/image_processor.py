@@ -10,7 +10,7 @@ import pyproj
 from datetime import datetime
 
 
-def extract_images_to_json(input_folder, output_file, target_crs="EPSG:5110", include_no_gps=False, verbose=False):
+def extract_images_to_json(input_folder, output_file, target_crs, include_no_gps=False, verbose=False):
     """
     Extract GPS coordinates and metadata from images and save to JSON
 
@@ -233,28 +233,30 @@ def get_gps_coordinates(image_path):
 def convert_coordinates(lat, lon, target_crs):
     """
     Convert GPS coordinates to target coordinate system
-
-    Args:
-        lat (float): Latitude in WGS84
-        lon (float): Longitude in WGS84
-        target_crs (str): Target CRS (e.g., "EPSG:5110")
-
-    Returns:
-        tuple: (x, y) in target coordinate system
     """
     try:
         # Define source and target CRS
         source_crs = pyproj.CRS("EPSG:4326")  # WGS84
         target_crs_obj = pyproj.CRS(target_crs)
+        
+        # # Validate the target CRS
+        # if not target_crs_obj.is_valid:
+        #     print(f"Invalid CRS: {target_crs}")
+        #     return None, None
 
         # Create transformer
         transformer = pyproj.Transformer.from_crs(source_crs, target_crs_obj, always_xy=True)
 
         # Transform coordinates
         x, y = transformer.transform(lon, lat)
+        
+        # Basic validation - check if coordinates are reasonable
+        if abs(x) > 1e10 or abs(y) > 1e10:
+            print(f"Suspicious transformation result: x={x}, y={y} for CRS {target_crs}")
+            return None, None
 
         return x, y
 
     except Exception as e:
-        print(f"Error converting coordinates: {e}")
+        print(f"Error converting coordinates to {target_crs}: {e}")
         return None, None

@@ -12,6 +12,8 @@ This Python project processes images with GPS coordinates, transforms coordinate
 - Proper coordinate system representation in IFC4.3 using EPSG codes
 - Support for various image formats (JPEG, PNG, TIFF)
 
+<img width="1373" height="759" alt="image" src="https://github.com/user-attachments/assets/e37527c0-6895-4984-ba88-04e182b07a43" />
+
 ## Installation
 
 1. Install Python dependencies:
